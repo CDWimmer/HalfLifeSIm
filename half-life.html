@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<!-- https://github.com/CDWimmer/HalfLifeSim -->
+    <meta charset="UTF-8">
+	<title>Half-life</title>
+	<link href='https://fonts.googleapis.com/css?family=Abel' rel='stylesheet'>
+	<style>
+	body {
+		background-color: white;
+		display: flex;
+		flex-direction:column; 
+		justify-content:center;
+		min-height:93vh;
+		font-family: 'Abel';
+	}
+	.content {
+		text-align: center;
+	}
+	h1,h3 {
+		margin-top: 20px;
+		margin-bottom: 20px;
+	}
+	#frequencySlider {
+			width: 300px;
+	}
+	#backgroundWarning {
+	  position: fixed;
+	  top: 0;
+	  right: 0;
+	  width: 10em;
+	  border: 3px solid #00ff32;
+	  text-align: center;
+	}
+	#backgroundWarningCloseDiv a {
+		color: #FF0000;
+		text-decoration: none;
+	}
+	#backgroundWarningCloseDiv a:hover {
+		text-decoration:underline;
+	}
+	#backgroundWarningCloseDiv {
+		float: right;
+		width: 30px;
+		height: 20px;
+		text-align: center;
+	}
+	#backgroundWarningText {
+		text-align: center;
+	}
+	</style>
+</head>
+<body>
+	<div class="content">
+	<h1>Each Pixel is an Atom</h1>
+	<h3>There are <span id="atoms">0</span> atoms. (<span id="decays" style="color:#FF0000;">0</span> decays, <span id="atomsLeft" style="color:#00ff32;">0</span> left.)</h3>
+	<canvas id=canvas1 style="border:4px solid #c3c3c3;"></canvas>
+	<div class="sliderContainer">Half-Life: <input type="range" min="1" max="10" value="10" id="halflifeSlider"> <span id="halflife">10</span> minutes</div><div class=buttonContainer><button id="halvebutton" onClick="halve()">Fast Halve</button></div>
+	<button id="startStopButton" onclick="startstop()">Start</button></div>
+	<div id="backgroundWarning"><div id="backgroundWarningText"><strong>n.b.</strong> The simulation may pause if not the selected tab. </div>
+		<div id="backgroundWarningCloseDiv">
+			<a href="#" onclick="Hide(backgroundWarning);">Hide</a>
+		</div>
+	</div>
+	<script>
+	var frequency = 60;
+	var min_halflife = 1;
+	var max_halflife = 60;
+	var halflife = 10;
+	var width = 600;
+	var height = 450;
+	var default_hex = "#00ff32";
+	var decay_hex = "#FF0000";
+	var decays = 0;
+	var atoms = width*height;
+	var atoms_left = atoms;
+	var decays_span = document.getElementById("decays");
+	var atoms_span = document.getElementById("atoms");
+	var atoms_left_span = document.getElementById("atomsLeft");
+	var halflife_slider = document.getElementById("halflifeSlider");
+	var halflife_span = document.getElementById("halflife");
+	var halve_button = document.getElementById("halvebutton");
+	var start_stop_button = document.getElementById("startStopButton");
+	var running = false;
+
+	halflife_slider.min = min_halflife;
+	halflife_slider.max = max_halflife;
+	halflife_slider.value = halflife;
+	halflife_span.innerHTML = halflife;
+
+	atoms_span.innerHTML = atoms;
+	atoms_left_span.innerHTML = atoms_left;
+
+	function rgbToHex(r, g, b) {
+	if (r > 255 || g > 255 || b > 255)
+		throw "Invalid color component";
+	return ((r << 16) | (g << 8) | b).toString(16);
+	}
+
+	function getRandomInt(max) {
+		return Math.floor(Math.random() * max);
+	}
+
+	var c=document.getElementById("canvas1");
+	c.width = width
+	c.height = height
+	var ctx=c.getContext("2d");
+	ctx.fillStyle=default_hex;
+	ctx.fillRect(0,0,width,height);
+
+	function decay(lambda) {
+		var ctx=c.getContext("2d");
+		let data = ctx.getImageData(0,0,width,height).data;
+		for(let i=0; i<width*height; ++i){
+			let y = Math.floor(i/width);
+			let x = i%width;
+			let red_index = y*width*4 + x*4;
+			var hex = "#" + ("000000" + rgbToHex(data[red_index], data[red_index+1], data[red_index+2])).slice(-6);
+			if(hex == default_hex && Math.random() < lambda) {
+				decays += 1;
+				atoms_left -= 1;
+				ctx.fillStyle = decay_hex;
+				ctx.fillRect(x,y,1,1);
+				atoms_left_span.innerHTML = atoms_left;
+				decays_span.innerHTML = decays;
+			}
+		}
+	}
+	halflife_slider.oninput = function() {
+		halflife = halflife_slider.value;
+		console.log(halflife)
+		clearInterval(tid)
+		tid = setInterval(decay, (1/frequency)*1000, 2/(halflife*60*frequency));
+		halflife_span.innerHTML = halflife;
+	}
+
+	var tid = null;
+	function startstop() {
+		if (running) {
+		clearInterval(tid);
+		running = false;
+		start_stop_button.innerHTML = "Start";
+		} else {
+			tid = setInterval(decay, (1/frequency)*1000, 2/(halflife*60*frequency));
+			running = true;
+			start_stop_button.innerHTML = "Stop";
+		}
+	}
+
+	function halve() {
+		console.log("Halving...");
+		halve_button.innerHTML = "Working...";
+		halve_button.enabled = false;
+		var ctx=c.getContext("2d");
+		let data = ctx.getImageData(0,0,width,height).data;
+		for(let i=0; i<width*height; ++i){
+			let y = Math.floor(i/width);
+			let x = i%width;
+			let red_index = y*width*4 + x*4;
+			var hex = "#" + ("000000" + rgbToHex(data[red_index], data[red_index+1], data[red_index+2])).slice(-6);
+			if(hex == default_hex && Math.random() < 0.5) {
+				decays += 1;
+				atoms_left -= 1;
+				ctx.fillStyle = decay_hex;
+				ctx.fillRect(x,y,1,1);
+				atoms_left_span.innerHTML = atoms_left;
+				decays_span.innerHTML = decays;
+			}
+		}
+		halve_button.innerHTML = "Fast Halve";
+		console.log("done halving!");
+	}
+	</script>
+	<script>
+	function Hide(HideID)
+	{
+		HideID.style.display = "none";
+	}
+</script>
+</body>
+</html>
